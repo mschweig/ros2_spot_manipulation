@@ -1,0 +1,14 @@
+# Request
+string hostname
+string image_source
+bool force_top_down_grasp
+bool force_horizontal_grasp
+bool force_45_angle_grasp
+bool force_squeeze_grasp
+---
+# Result
+bool success
+string message
+---
+# Feedback
+string current_state
