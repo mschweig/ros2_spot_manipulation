@@ -1,0 +1,1 @@
+# ros2_spot_manipulation_interface
