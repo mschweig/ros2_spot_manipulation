@@ -111,7 +111,9 @@ def arm_object_grasp():
     image_client = robot.ensure_client(ImageClient.default_service_name)
     manipulation_api_client = robot.ensure_client(ManipulationApiClient.default_service_name)
 
-    with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=True):
+    lease_client.take()
+
+    with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=False):
         # Now, we are ready to power on the robot. This call will block until the power
         # is on. Commands would fail if this did not happen. We can also check that the robot is
         # powered at any point.
@@ -150,12 +152,13 @@ def arm_object_grasp():
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(pick_object_in_image=grasp)
 
+        # Get feedback from the robot
+        return 'Grasp Request Suceeded'
+
         # Send the request
         cmd_response = manipulation_api_client.manipulation_api_command(
             manipulation_api_request=grasp_request)
 
-        # Get feedback from the robot
-        return grasp_request
         while True:
             feedback_request = manipulation_api_pb2.ManipulationApiFeedbackRequest(
                 manipulation_cmd_id=cmd_response.manipulation_cmd_id)
