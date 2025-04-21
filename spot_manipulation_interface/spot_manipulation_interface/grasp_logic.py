@@ -97,12 +97,12 @@ def add_grasp_constraint(config, grasp, robot_state_client):
         constraint = grasp.grasp_params.allowable_orientation.add()
         constraint.squeeze_grasp.SetInParent()
 
-def arm_object_grasp():
+def arm_object_grasp(username, password, hostname):
     """A simple example of using the Boston Dynamics API to command Spot's arm."""
 
     sdk = bosdyn.client.create_standard_sdk('ROS2 Grasp Action')
-    robot = sdk.create_robot('192.168.50.3')
-    robot.authenticate('user', 'vfx43te7ocvq')
+    robot = sdk.create_robot(hostname)
+    robot.authenticate(username, password)
     robot.time_sync.wait_for_sync()
 
     assert robot.has_arm(), 'Robot requires an arm to run this example.'
