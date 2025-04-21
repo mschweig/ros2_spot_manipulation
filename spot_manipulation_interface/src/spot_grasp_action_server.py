@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from spot_manipulation_interface.action import Grasp
-from grasp_logic import arm_object_grasp
+from src.grasp_logic import arm_object_grasp
 
 
 class SpotGraspActionServer(Node):
