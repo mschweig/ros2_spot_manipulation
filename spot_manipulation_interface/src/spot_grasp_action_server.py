@@ -30,6 +30,7 @@ class SpotGraspActionServer(Node):
         password = self.get_parameter('password').get_parameter_value().string_value
         hostname = self.get_parameter('hostname').get_parameter_value().string_value
         result.message = arm_object_grasp(username, password, hostname)
+        result.success = True
         goal_handle.succeed()  
         return result
 
