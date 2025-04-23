@@ -1,6 +1,10 @@
 # Request
 string hostname
 string image_source
+int32 x_min
+int32 y_min
+int32 x_max
+int32 y_max
 bool force_top_down_grasp
 bool force_horizontal_grasp
 bool force_45_angle_grasp

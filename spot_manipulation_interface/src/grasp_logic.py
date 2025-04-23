@@ -97,7 +97,7 @@ def add_grasp_constraint(config, grasp, robot_state_client):
         constraint = grasp.grasp_params.allowable_orientation.add()
         constraint.squeeze_grasp.SetInParent()
 
-def arm_object_grasp(username, password, hostname):
+def arm_object_grasp(username, password, hostname, center_x, center_y):
     """A simple example of using the Boston Dynamics API to command Spot's arm."""
 
     sdk = bosdyn.client.create_standard_sdk('ROS2 Grasp Action')
@@ -140,7 +140,7 @@ def arm_object_grasp(username, password, hostname):
             print(image_responses)
             assert False
 
-        pick_vec = geometry_pb2.Vec2(x=50, y=60)
+        pick_vec = geometry_pb2.Vec2(x=center_x, y=center_y)
 
         # Build the proto
         image = image_responses[0]
@@ -179,13 +179,13 @@ def arm_object_grasp(username, password, hostname):
         robot.logger.info('Finished grasp.')
         time.sleep(4.0)
 
-        robot.logger.info('Sitting down and turning off.')
+        #robot.logger.info('Sitting down and turning off.')
 
         # Power the robot off. By specifying "cut_immediately=False", a safe power off command
         # is issued to the robot. This will attempt to sit the robot before powering off.
-        robot.power_off(cut_immediately=False, timeout_sec=20)
-        assert not robot.is_powered_on(), 'Robot power off failed.'
-        robot.logger.info('Robot safely powered off.')
+        # robot.power_off(cut_immediately=False, timeout_sec=20)
+        # assert not robot.is_powered_on(), 'Robot power off failed.'
+        # robot.logger.info('Robot safely powered off.')
 
 
 
