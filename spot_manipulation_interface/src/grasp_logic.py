@@ -114,10 +114,7 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
     lease_client.take()
 
     with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=False):
-        # Now, we are ready to power on the robot. This call will block until the power
-        # is on. Commands would fail if this did not happen. We can also check that the robot is
-        # powered at any point.
-        robot.logger.info('Powering on robot... This may take a several seconds.')
+
         robot.power_on(timeout_sec=20)
         assert robot.is_powered_on(), 'Robot power on failed.'
         robot.logger.info('Robot powered on.')
@@ -131,9 +128,7 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
         blocking_stand(command_client, timeout_sec=10)
         robot.logger.info('Robot standing.')
 
-        # Take a picture with a camera
-        robot.logger.info('Getting an image from: %s', 'hand_image')
-        image_responses = image_client.get_image_from_sources(['hand_image'])
+        image_responses = image_client.get_image_from_sources(['frontright_fisheye_image'])
 
         if len(image_responses) != 1:
             print(f'Got invalid number of images: {len(image_responses)}')
@@ -144,6 +139,7 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
 
         # Build the proto
         image = image_responses[0]
+
         grasp = manipulation_api_pb2.PickObjectInImage(
             pixel_xy=pick_vec, transforms_snapshot_for_camera=image.shot.transforms_snapshot,
             frame_name_image_sensor=image.shot.frame_name_image_sensor,
@@ -151,9 +147,6 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(pick_object_in_image=grasp)
-
-        # Get feedback from the robot
-        return 'Grasp Request Suceeded'
 
         # Send the request
         cmd_response = manipulation_api_client.manipulation_api_command(
@@ -178,6 +171,9 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
 
         robot.logger.info('Finished grasp.')
         time.sleep(4.0)
+
+        # Get feedback from the robot
+        return 'Grasp Request Suceeded'
 
         #robot.logger.info('Sitting down and turning off.')
 

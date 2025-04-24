@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+import math
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from spot_manipulation_interface.action import Grasp
@@ -29,13 +30,13 @@ class SpotGraspActionServer(Node):
         feedback_msg.current_state = 'Starting Grasp'
         result = Grasp.Result()
     
-        bbox_xmin = goal_handle.request.x_min
-        bbox_xmax = goal_handle.request.x_max
-        bbox_ymin = goal_handle.request.y_min
-        bbox_ymax = goal_handle.request.y_max
+        bbox_xmin = goal_handle.request.x_min * 640 / 1000
+        bbox_xmax = goal_handle.request.x_max * 640 / 1000
+        bbox_ymin = goal_handle.request.y_min * 480 / 1000
+        bbox_ymax = goal_handle.request.y_max * 480 / 1000
         
-        center_x = (bbox_xmin + bbox_xmax) // 2
-        center_y = (bbox_ymin + bbox_ymax) // 2
+        center_x = (bbox_xmax + bbox_xmin) / 2.0
+        center_y = (bbox_ymax + bbox_ymin) / 2.0
 
         result.message = arm_object_grasp(self.username, self.password, self.hostname, center_x, center_y)
         result.success = True
