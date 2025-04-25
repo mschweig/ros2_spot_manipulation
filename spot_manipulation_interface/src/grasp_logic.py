@@ -97,7 +97,7 @@ def add_grasp_constraint(config, grasp, robot_state_client):
         constraint = grasp.grasp_params.allowable_orientation.add()
         constraint.squeeze_grasp.SetInParent()
 
-def arm_object_grasp(username, password, hostname, center_x, center_y):
+def arm_object_grasp(username, password, hostname, center_x, center_y, camera_name):
     """A simple example of using the Boston Dynamics API to command Spot's arm."""
 
     sdk = bosdyn.client.create_standard_sdk('ROS2 Grasp Action')
@@ -128,7 +128,7 @@ def arm_object_grasp(username, password, hostname, center_x, center_y):
         blocking_stand(command_client, timeout_sec=10)
         robot.logger.info('Robot standing.')
 
-        image_responses = image_client.get_image_from_sources(['frontright_fisheye_image'])
+        image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image'])
 
         if len(image_responses) != 1:
             print(f'Got invalid number of images: {len(image_responses)}')
