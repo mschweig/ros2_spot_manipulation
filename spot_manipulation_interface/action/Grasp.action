@@ -1,6 +1,6 @@
 # Request
 string hostname
-string image_source
+string camera_name
 int32 x_min
 int32 y_min
 int32 x_max
