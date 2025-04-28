@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from spot_manipulation_interface.action import PickAndPlace
-from src.grasp_logic import arm_object_pick
+from src.pick_logic import arm_object_pick
 from src.place_logic import arm_object_place
 
 class SpotGraspActionServer(Node):
