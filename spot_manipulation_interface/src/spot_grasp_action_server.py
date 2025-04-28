@@ -2,13 +2,14 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
-from spot_manipulation_interface.action import Grasp
-from src.grasp_logic import arm_object_grasp
+from spot_manipulation_interface.action import PickAndPlace
+from src.grasp_logic import arm_object_pick
+from src.place_logic import arm_object_place
 
 class SpotGraspActionServer(Node):
     def __init__(self):
-        super().__init__('spot_grasp_action_server')
-        self._action_server = ActionServer(self, Grasp, 'timon/grasp_object', self.execute_callback)
+        super().__init__('spot_picknplace_action_server')
+        self._action_server = ActionServer(self, PickAndPlace, 'timon/pick_and_place_object', self.execute_callback)
         # Declare parameters for credentials and behavior
         self.declare_parameters(
             namespace='',
@@ -41,10 +42,10 @@ class SpotGraspActionServer(Node):
         return x_orig, y_orig
 
     def execute_callback(self, goal_handle):
-        self.get_logger().info('Grasp action received')
-        feedback_msg = Grasp.Feedback()
-        feedback_msg.current_state = 'Starting Grasp'
-        result = Grasp.Result()
+        action_type = "Pick" if PickAndPlace.pick else "Place" if PickAndPlace.place else None
+        self.get_logger().info(f"PicknPlace action received: {action_type}")
+        feedback_msg = PickAndPlace.Feedback()
+        result = PickAndPlace.Result()
         camera_name = goal_handle.request.camera_name
         if camera_name == 'frontleft' or camera_name == 'frontright':
             width, height = 480, 640
@@ -63,10 +64,19 @@ class SpotGraspActionServer(Node):
 
         self.get_logger().info(f"Original center after rotation correction: ({orig_center_x}, {orig_center_y}) based on camera: {camera_name}")
 
-        result.success = arm_object_grasp(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-        result.message = "Grasp suceeded"
-        goal_handle.succeed()  
-        return result
+        if PickAndPlace.pick:
+            result.success = arm_object_pick(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
+            result.message = "Grasp suceeded"
+            goal_handle.succeed()  
+            return result
+        elif PickAndPlace.place:
+            result.success = arm_object_place(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
+            result.message = "Grasp suceeded"
+            goal_handle.succeed() 
+            return result
+        else: 
+            self.get_logger().error("Received wrong action type")
+
 
 
 def main(args=None):
