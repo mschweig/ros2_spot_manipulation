@@ -12,8 +12,8 @@ def generate_launch_description():
         ),
         Node(
             package='spot_manipulation_interface',
-            executable='spot_grasp_action_server',
-            name='spot_grasp_action_server',
+            executable='spot_picknplace_action_server',
+            name='spot_picknplace_action_server',
             output='screen',
             parameters=[LaunchConfiguration('param_file')]
         )

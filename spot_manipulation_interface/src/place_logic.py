@@ -9,6 +9,7 @@ import bosdyn.client
 import bosdyn.client.estop
 import bosdyn.client.lease
 import bosdyn.client.util
+from google.protobuf import wrappers_pb2
 from bosdyn.api import geometry_pb2, manipulation_api_pb2
 from bosdyn.client import frame_helpers
 from bosdyn.client.frame_helpers import VISION_FRAME_NAME, get_vision_tform_body, math_helpers
@@ -48,12 +49,13 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         # Build the proto
         image = image_responses[0]
 
-        # Walk to Goal
+        ### Walk to Goal ###
         # Build the proto
+        offset_distance = wrappers_pb2.FloatValue(value=0.8)
         walk_to = manipulation_api_pb2.WalkToObjectInImage(
             pixel_xy=walk_vec, transforms_snapshot_for_camera=image.shot.transforms_snapshot,
             frame_name_image_sensor=image.shot.frame_name_image_sensor,
-            camera_model=image.source.pinhole, offset_distance=0.8)
+            camera_model=image.source.pinhole, offset_distance=offset_distance)
 
         # Ask the robot to pick up the object
         walk_to_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -82,8 +84,7 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         robot.logger.info('At Goal Location... Getting Ready for Manipulation')
         
         # Build to Arm Goal
-        vision_tform_obj = frame_helpers.get_a_tform_b(image.shot.transforms_snapshot, frame_helpers.VISION_FRAME_NAME,
-                                                       image.shot.image_properties.frame_name_image_coordinates)
+        vision_tform_obj = frame_helpers.get_a_tform_b(image.shot.transforms_snapshot, frame_helpers.VISION_FRAME_NAME, image.shot.frame_name_image_sensor)
 
         
         hand_ewrt_flat_body = geometry_pb2.Vec3(x=(vision_tform_obj.position.x-0.08),
@@ -120,6 +121,8 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
 
         # Wait for the object to fall out
         time.sleep(1.5)
+
+        return True
         
 
 
