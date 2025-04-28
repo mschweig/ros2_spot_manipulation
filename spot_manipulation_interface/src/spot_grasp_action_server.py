@@ -63,8 +63,8 @@ class SpotGraspActionServer(Node):
 
         self.get_logger().info(f"Original center after rotation correction: ({orig_center_x}, {orig_center_y}) based on camera: {camera_name}")
 
-        result.message = arm_object_grasp(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-        result.success = True
+        result.success = arm_object_grasp(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
+        result.message = "Grasp suceeded"
         goal_handle.succeed()  
         return result
 

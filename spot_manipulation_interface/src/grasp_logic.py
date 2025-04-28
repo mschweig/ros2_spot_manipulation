@@ -17,7 +17,7 @@ from bosdyn.client.estop import EstopClient
 from bosdyn.client.frame_helpers import VISION_FRAME_NAME, get_vision_tform_body, math_helpers
 from bosdyn.client.image import ImageClient
 from bosdyn.client.manipulation_api_client import ManipulationApiClient
-from bosdyn.client.robot_command import RobotCommandClient, blocking_stand
+from bosdyn.client.robot_command import RobotCommandClient, blocking_stand, RobotCommandBuilder
 from bosdyn.client.robot_state import RobotStateClient
 
 
@@ -170,18 +170,13 @@ def arm_object_grasp(username, password, hostname, center_x, center_y, camera_na
             time.sleep(0.25)
 
         robot.logger.info('Finished grasp.')
-        time.sleep(4.0)
+        time.sleep(2.0)
 
         # Get feedback from the robot
-        return 'Grasp Request Suceeded'
-
-        #robot.logger.info('Sitting down and turning off.')
-
-        # Power the robot off. By specifying "cut_immediately=False", a safe power off command
-        # is issued to the robot. This will attempt to sit the robot before powering off.
-        # robot.power_off(cut_immediately=False, timeout_sec=20)
-        # assert not robot.is_powered_on(), 'Robot power off failed.'
-        # robot.logger.info('Robot safely powered off.')
+        carry_cmd = RobotCommandBuilder.arm_carry_command()
+        command_client.robot_command(carry_cmd)
+        time.sleep(2)
+        return True
 
 
 
