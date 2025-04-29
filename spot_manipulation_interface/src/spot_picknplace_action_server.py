@@ -43,9 +43,7 @@ class SpotGraspActionServer(Node):
         return x_orig, y_orig
 
     def execute_callback(self, goal_handle):
-        action_type = "Pick" if goal_handle.request.pick else "Place" if goal_handle.request.place else None
-        self.get_logger().info(f"PicknPlace action received: {action_type}")
-        feedback_msg = PickAndPlace.Feedback()
+        self.get_logger().info(f"PicknPlace action received: {goal_handle.request.task}")
         result = PickAndPlace.Result()
         camera_name = goal_handle.request.camera_name
         if camera_name == 'frontleft' or camera_name == 'frontright':
@@ -65,15 +63,15 @@ class SpotGraspActionServer(Node):
 
         self.get_logger().info(f"Original center after rotation correction: ({orig_center_x}, {orig_center_y}) based on camera: {camera_name}")
 
-        if goal_handle.request.pick:
+        if goal_handle.request.task == "pick":
             result.success, result.message = arm_object_pick(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
             goal_handle.succeed()  
             return result
-        elif goal_handle.request.walk:
+        elif goal_handle.request.task == "walk":
             result.success, result.message = arm_object_walk(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
             goal_handle.succeed() 
             return result
-        elif goal_handle.request.place:
+        elif goal_handle.request.task == "place":
             result.success, result.message = arm_object_place(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
             goal_handle.succeed() 
             return result

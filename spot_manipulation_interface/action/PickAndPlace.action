@@ -1,9 +1,7 @@
 # Request
 string hostname
 string camera_name
-bool pick
-bool walk
-bool place
+string task
 int32 x_min
 int32 y_min
 int32 x_max
