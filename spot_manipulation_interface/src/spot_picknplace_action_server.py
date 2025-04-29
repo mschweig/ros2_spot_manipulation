@@ -5,6 +5,7 @@ from rclpy.action import ActionServer
 from spot_manipulation_interface.action import PickAndPlace
 from src.pick_logic import arm_object_pick
 from src.place_logic import arm_object_place
+from src.walk_logic import arm_object_walk
 
 class SpotGraspActionServer(Node):
     def __init__(self):
@@ -65,13 +66,15 @@ class SpotGraspActionServer(Node):
         self.get_logger().info(f"Original center after rotation correction: ({orig_center_x}, {orig_center_y}) based on camera: {camera_name}")
 
         if goal_handle.request.pick:
-            result.success = arm_object_pick(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-            result.message = "Grasp suceeded"
+            result.success, result.message = arm_object_pick(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
             goal_handle.succeed()  
             return result
+        elif goal_handle.request.walk:
+            result.success, result.message = arm_object_walk(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
+            goal_handle.succeed() 
+            return result
         elif goal_handle.request.place:
-            result.success = arm_object_place(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-            result.message = "Grasp suceeded"
+            result.success, result.message = arm_object_place(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
             goal_handle.succeed() 
             return result
         else: 

@@ -9,11 +9,12 @@ import bosdyn.client
 import bosdyn.client.estop
 import bosdyn.client.lease
 import bosdyn.client.util
+import numpy as np
 from google.protobuf import wrappers_pb2
 from bosdyn.api import geometry_pb2, manipulation_api_pb2
 from bosdyn.client import frame_helpers
 from bosdyn.client.frame_helpers import VISION_FRAME_NAME, get_vision_tform_body, math_helpers
-from bosdyn.client.image import ImageClient
+from bosdyn.client.image import ImageClient, pixel_to_camera_space
 from bosdyn.client.manipulation_api_client import ManipulationApiClient
 from bosdyn.client.robot_command import RobotCommandClient, blocking_stand, RobotCommandBuilder, block_until_arm_arrives
 from bosdyn.client.robot_state import RobotStateClient
@@ -29,73 +30,72 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
 
     lease_client = robot.ensure_client(bosdyn.client.lease.LeaseClient.default_service_name)
     image_client = robot.ensure_client(ImageClient.default_service_name)
-    manipulation_api_client = robot.ensure_client(ManipulationApiClient.default_service_name)
-
     lease_client.take()
 
     with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=False):
 
         command_client = robot.ensure_client(RobotCommandClient.default_service_name)
 
-        image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image'])
+        image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image', camera_name+'_depth_in_visual_frame'])
 
         if len(image_responses) != 1:
             print(f'Got invalid number of images: {len(image_responses)}')
             print(image_responses)
             assert False
 
-        walk_vec = geometry_pb2.Vec2(x=center_x, y=center_y)
+                # Unpack images
+        image_color = image_responses[0]
+        image_depth = image_responses[1]
 
-        # Build the proto
-        image = image_responses[0]
-
-        ### Walk to Goal ###
-        # Build the proto
-        offset_distance = wrappers_pb2.FloatValue(value=0.8)
-        walk_to = manipulation_api_pb2.WalkToObjectInImage(
-            pixel_xy=walk_vec, transforms_snapshot_for_camera=image.shot.transforms_snapshot,
-            frame_name_image_sensor=image.shot.frame_name_image_sensor,
-            camera_model=image.source.pinhole, offset_distance=offset_distance)
-
-        # Ask the robot to pick up the object
-        walk_to_request = manipulation_api_pb2.ManipulationApiRequest(
-            walk_to_object_in_image=walk_to)
-
-        # Send the request
-        cmd_response = manipulation_api_client.manipulation_api_command(
-            manipulation_api_request=walk_to_request)
-
-        # Get feedback from the robot
-        while True:
-            time.sleep(0.25)
-            feedback_request = manipulation_api_pb2.ManipulationApiFeedbackRequest(
-                manipulation_cmd_id=cmd_response.manipulation_cmd_id)
-
-            # Send the request
-            response = manipulation_api_client.manipulation_api_feedback_command(
-                manipulation_api_feedback_request=feedback_request)
-
-            print('Current state: ',
-                  manipulation_api_pb2.ManipulationFeedbackState.Name(response.current_state))
-
-            if response.current_state == manipulation_api_pb2.MANIP_STATE_DONE:
-                break
-
-        robot.logger.info('At Goal Location... Getting Ready for Manipulation')
+        # Load depth image
+        depth_image = np.frombuffer(image_depth.shot.image.data, dtype=np.uint16)
+        depth_image = depth_image.reshape(
+            image_depth.shot.image.rows,
+            image_depth.shot.image.cols
+        )
         
-        # Build to Arm Goal
-        vision_tform_obj = frame_helpers.get_a_tform_b(image.shot.transforms_snapshot, frame_helpers.VISION_FRAME_NAME, image.shot.frame_name_image_sensor)
+        # Read depth at the requested center pixel
+        raw_depth = depth_image[int(center_y), int(center_x)]
+        if raw_depth == 0:
+            raise ValueError("Invalid depth value (zero) at given pixel.")
+
+        # Scale depth properly (depth_scale is usually 1000 for mm->m conversion)
+        depth_scale = image_depth.source.depth_scale if image_depth.source.depth_scale else 1000.0
+        depth_m = raw_depth / depth_scale
+
+        # Compute 3D point in camera frame
+        x_cam, y_cam, z_cam = pixel_to_camera_space(
+            image_depth.source, int(center_x), int(center_y), depth=depth_m
+        )
+
+        # Build a 3D point in the camera frame
+        point_in_camera = geometry_pb2.Vec3(x=x_cam, y=y_cam, z=z_cam)
+
+        # Now transform point from camera frame to vision frame
+        vision_T_camera = frame_helpers.get_a_tform_b(
+            image_color.shot.transforms_snapshot,  # Use snapshot from color image
+            VISION_FRAME_NAME,
+            image_color.shot.frame_name_image_sensor
+        )
+
+        # Transform the point
+        point_in_vision = math_helpers.transform_point(vision_T_camera, point_in_camera)
 
         
-        hand_ewrt_flat_body = geometry_pb2.Vec3(x=(vision_tform_obj.position.x-0.08),
-                                                y=vision_tform_obj.position.y,
-                                                z=(vision_tform_obj.position.z))
+        # Define the desired hand position
+        hand_ewrt_flat_body = geometry_pb2.Vec3(
+            x=point_in_vision.x,
+            y=point_in_vision.y,
+            z=point_in_vision.z
+        )
 
-        # Point the hand straight down with a quaternion.
+        # Use simple orientation: gripper pointing down
         flat_body_Q_hand = geometry_pb2.Quaternion(w=1, x=0, y=0, z=0)
 
-        flat_body_tform_hand = geometry_pb2.SE3Pose(position=hand_ewrt_flat_body,
-                                                    rotation=flat_body_Q_hand)
+        flat_body_tform_hand = geometry_pb2.SE3Pose(
+            position=hand_ewrt_flat_body,
+            rotation=flat_body_Q_hand
+        )
 
         arm_command = RobotCommandBuilder.arm_pose_command_from_pose(
             flat_body_tform_hand,
@@ -122,7 +122,7 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         # Wait for the object to fall out
         time.sleep(1.5)
 
-        return True
+        return True, "Object sucessfully placed"
         
 
 

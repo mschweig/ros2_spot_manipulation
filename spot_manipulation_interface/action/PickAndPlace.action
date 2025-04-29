@@ -2,6 +2,7 @@
 string hostname
 string camera_name
 bool pick
+bool walk
 bool place
 int32 x_min
 int32 y_min

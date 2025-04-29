@@ -125,7 +125,6 @@ def arm_object_pick(username, password, hostname, center_x, center_y, camera_nam
         # command service requires timesync between the robot and the client.
         robot.logger.info('Commanding robot to stand...')
         command_client = robot.ensure_client(RobotCommandClient.default_service_name)
-        blocking_stand(command_client, timeout_sec=10)
         robot.logger.info('Robot standing.')
 
         image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image'])
@@ -169,14 +168,13 @@ def arm_object_pick(username, password, hostname, center_x, center_y, camera_nam
 
             time.sleep(0.25)
 
-        robot.logger.info('Finished grasp.')
         time.sleep(2.0)
 
         # Get feedback from the robot
         carry_cmd = RobotCommandBuilder.arm_carry_command()
         command_client.robot_command(carry_cmd)
         time.sleep(2)
-        return True
+        return True, "Finished Grasp"
 
 
 
