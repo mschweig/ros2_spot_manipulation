@@ -38,12 +38,7 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
 
         image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image', camera_name+'_depth_in_visual_frame'])
 
-        if len(image_responses) != 1:
-            print(f'Got invalid number of images: {len(image_responses)}')
-            print(image_responses)
-            assert False
-
-                # Unpack images
+        # Unpack images
         image_color = image_responses[0]
         image_depth = image_responses[1]
 
@@ -71,31 +66,30 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         # Build a 3D point in the camera frame
         point_in_camera = geometry_pb2.Vec3(x=x_cam, y=y_cam, z=z_cam)
 
-        # Now transform point from camera frame to vision frame
         vision_T_camera = frame_helpers.get_a_tform_b(
-            image_color.shot.transforms_snapshot,  # Use snapshot from color image
+            image_color.shot.transforms_snapshot,
             VISION_FRAME_NAME,
             image_color.shot.frame_name_image_sensor
         )
 
-        # Transform the point
-        point_in_vision = math_helpers.transform_point(vision_T_camera, point_in_camera)
+        # Now directly use vision_T_camera to transform the point:
+        point_in_vision_np = vision_T_camera.transform_point(point_in_camera.x, point_in_camera.y, point_in_camera.z)
+    
 
-        
-        # Define the desired hand position
-        hand_ewrt_flat_body = geometry_pb2.Vec3(
-            x=point_in_vision.x,
-            y=point_in_vision.y,
-            z=point_in_vision.z
+        # Convert back to proto Vec3
+        point_in_vision = geometry_pb2.Vec3(
+            x=point_in_vision_np[0],
+            y=point_in_vision_np[1],
+            z=point_in_vision_np[2]
         )
 
-        # Use simple orientation: gripper pointing down
-        flat_body_Q_hand = geometry_pb2.Quaternion(w=1, x=0, y=0, z=0)
-
+        # Build the desired hand pose
+        flat_body_Q_hand = geometry_pb2.Quaternion(w=0.707, x=0, y=0.707, z=0)  # gripper pointing down
         flat_body_tform_hand = geometry_pb2.SE3Pose(
-            position=hand_ewrt_flat_body,
+            position=point_in_vision,
             rotation=flat_body_Q_hand
         )
+
 
         arm_command = RobotCommandBuilder.arm_pose_command_from_pose(
             flat_body_tform_hand,
@@ -120,9 +114,14 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         cmd_id = command_client.robot_command(command)
 
         # Wait for the object to fall out
-        time.sleep(1.5)
+        time.sleep(3)
 
-        return True, "Object sucessfully placed"
+        #stow the arm
+        stow_cmd = RobotCommandBuilder.arm_stow_command()
+        stow_command_id = command_client.robot_command(stow_cmd)
+        block_until_arm_arrives(command_client, stow_command_id, 3.0)
+        time.sleep(1)
+        return True, "Object sucessfully placed and Arm stowed"
         
 
 
