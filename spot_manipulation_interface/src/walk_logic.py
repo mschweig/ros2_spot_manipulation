@@ -22,7 +22,7 @@ from bosdyn.client.robot_state import RobotStateClient
 def arm_object_walk(username, password, hostname, center_x, center_y, camera_name):
     """A simple example of using the Boston Dynamics API to command Spot's arm."""
 
-    sdk = bosdyn.client.create_standard_sdk('ROS2 Place Action')
+    sdk = bosdyn.client.create_standard_sdk('ROS2 Walk Action')
     robot = sdk.create_robot(hostname)
     robot.authenticate(username, password)
     robot.time_sync.wait_for_sync()
