@@ -30,29 +30,63 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
 
     lease_client = robot.ensure_client(bosdyn.client.lease.LeaseClient.default_service_name)
     image_client = robot.ensure_client(ImageClient.default_service_name)
+
+    image_responses = image_client.get_image_from_sources([camera_name+'_depth_in_visual_frame'])
+
+    # Unpack images
+    image_depth = image_responses[0]
+
+    # Load depth image
+    depth_image = np.frombuffer(image_depth.shot.image.data, dtype=np.uint16)
+
+    depth_image = depth_image.reshape(
+        image_depth.shot.image.rows,
+        image_depth.shot.image.cols
+    )
+    
+    # Read depth at the requested center pixel
+    # Try to get the raw depth at the center pixel
+    raw_depth = depth_image[int(center_y), int(center_x)]
+
+    if raw_depth == 0:
+        # Search a surrounding neighborhood for valid depth
+        print("Center depth invalid. Searching nearby pixels...")
+
+        search_window = 25  # Search +/-25 pixels (50x50 window total)
+
+        height, width = depth_image.shape
+        found_valid = False
+        best_depth = None
+
+        for dy in range(-search_window, search_window + 1):
+            for dx in range(-search_window, search_window + 1):
+                ny = int(center_y) + dy
+                nx = int(center_x) + dx
+
+                # Check bounds
+                if ny < 0 or ny >= height or nx < 0 or nx >= width:
+                    continue
+
+                candidate_depth = depth_image[ny, nx]
+
+                if candidate_depth > 0:
+                    if not found_valid or candidate_depth < best_depth:
+                        # Prefer closest valid depth (smallest)
+                        best_depth = candidate_depth
+                        found_valid = True
+
+        if not found_valid:
+            raise ValueError("No valid depth found around center pixel.")
+
+        print(f"Using nearby depth value: {best_depth} at offset from center.")
+
+        raw_depth = best_depth
+    
     lease_client.take()
 
     with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=False):
 
         command_client = robot.ensure_client(RobotCommandClient.default_service_name)
-
-        image_responses = image_client.get_image_from_sources([camera_name+'_fisheye_image', camera_name+'_depth_in_visual_frame'])
-
-        # Unpack images
-        image_color = image_responses[0]
-        image_depth = image_responses[1]
-
-        # Load depth image
-        depth_image = np.frombuffer(image_depth.shot.image.data, dtype=np.uint16)
-        depth_image = depth_image.reshape(
-            image_depth.shot.image.rows,
-            image_depth.shot.image.cols
-        )
-        
-        # Read depth at the requested center pixel
-        raw_depth = depth_image[int(center_y), int(center_x)]
-        if raw_depth == 0:
-            raise ValueError("Invalid depth value (zero) at given pixel.")
 
         # Scale depth properly (depth_scale is usually 1000 for mm->m conversion)
         depth_scale = image_depth.source.depth_scale if image_depth.source.depth_scale else 1000.0
@@ -67,9 +101,9 @@ def arm_object_place(username, password, hostname, center_x, center_y, camera_na
         point_in_camera = geometry_pb2.Vec3(x=x_cam, y=y_cam, z=z_cam)
 
         vision_T_camera = frame_helpers.get_a_tform_b(
-            image_color.shot.transforms_snapshot,
+            image_depth.shot.transforms_snapshot,
             VISION_FRAME_NAME,
-            image_color.shot.frame_name_image_sensor
+            image_depth.shot.frame_name_image_sensor
         )
 
         # Now directly use vision_T_camera to transform the point:
