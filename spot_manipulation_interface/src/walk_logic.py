@@ -49,7 +49,7 @@ def arm_object_walk(username, password, hostname, center_x, center_y, camera_nam
 
         ### Walk to Goal ###
         # Build the proto
-        offset_distance = wrappers_pb2.FloatValue(value=0.8)
+        offset_distance = wrappers_pb2.FloatValue(value=0.5)
         walk_to = manipulation_api_pb2.WalkToObjectInImage(
             pixel_xy=walk_vec, transforms_snapshot_for_camera=image.shot.transforms_snapshot,
             frame_name_image_sensor=image.shot.frame_name_image_sensor,

@@ -9,7 +9,7 @@ from src.walk_logic import arm_object_walk
 
 class SpotGraspActionServer(Node):
     def __init__(self):
-        super().__init__('spot_picknplace_action_server')
+        super().__init__('pick_and_place_object')
         self._action_server = ActionServer(self, PickAndPlace, 'timon/pick_and_place_object', self.execute_callback)
         # Declare parameters for credentials and behavior
         self.declare_parameters(
@@ -51,10 +51,10 @@ class SpotGraspActionServer(Node):
         else:
             width, height = 640, 480
 
-        bbox_xmin = goal_handle.request.x_min * width / 1000
-        bbox_xmax = goal_handle.request.x_max * width / 1000
-        bbox_ymin = goal_handle.request.y_min * height / 1000
-        bbox_ymax = goal_handle.request.y_max * height / 1000
+        bbox_xmin = goal_handle.request.x_min
+        bbox_xmax = goal_handle.request.x_max
+        bbox_ymin = goal_handle.request.y_min
+        bbox_ymax = goal_handle.request.y_max
 
         center_x = (bbox_xmax + bbox_xmin) / 2.0
         center_y = (bbox_ymax + bbox_ymin) / 2.0
