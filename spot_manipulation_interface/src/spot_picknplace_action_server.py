@@ -46,16 +46,22 @@ class SpotGraspActionServer(Node):
         self.get_logger().info(f"PicknPlace action received: {goal_handle.request.task}")
         result = PickAndPlace.Result()
         camera_name = goal_handle.request.camera_name
-        if camera_name == 'frontleft' or camera_name == 'frontright':
-            width, height = 480, 640
-        else:
-            width, height = 640, 480
+        if camera_name not in ('frontleft', 'frontright', 'left', 'right', 'back'):
+            self.get_logger().error("Do not use Hand Camera.")
+            result.success, result.message = False, "Use a valid camera"
+            return result
 
         bbox_xmin = goal_handle.request.x_min
         bbox_xmax = goal_handle.request.x_max
         bbox_ymin = goal_handle.request.y_min
         bbox_ymax = goal_handle.request.y_max
 
+        if None in (bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax):
+            # Handle the error or return failure
+            self.get_logger().error("One or more bounding box coordinates are not set.")
+            result.success, result.message = False, "Missing coordinates, properly set them in the request"
+            return result 
+        
         center_x = (bbox_xmax + bbox_xmin) / 2.0
         center_y = (bbox_ymax + bbox_ymin) / 2.0
 
@@ -77,7 +83,8 @@ class SpotGraspActionServer(Node):
             return result
         else: 
             self.get_logger().error("Received wrong action type")
-
+            result.success, result.message = False, "Received wrong task type"
+            return result
 
 
 def main(args=None):

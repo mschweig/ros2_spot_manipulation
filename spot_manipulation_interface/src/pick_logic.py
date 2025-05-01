@@ -174,7 +174,7 @@ def arm_object_pick(username, password, hostname, center_x, center_y, camera_nam
         carry_cmd = RobotCommandBuilder.arm_carry_command()
         command_client.robot_command(carry_cmd)
         time.sleep(2)
-        return True, "Finished Grasp"
+        return True, "Finished grasping, carrying object now"
 
 
 
