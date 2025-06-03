@@ -1,96 +1,182 @@
 #!/usr/bin/env python3
+"""ROS2 action server for Spot manipulation operations."""
+
+import os
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
+
 from spot_manipulation_interface.action import PickAndPlace
-from src.pick_logic import arm_object_pick
-from src.place_logic import arm_object_place
-from src.walk_logic import arm_object_walk
+from src.spot_client import SpotClient, SpotClientError
+from src.camera_utils import CameraCoordinateTransformer
+from src.task_factory import TaskFactory
 
-class SpotGraspActionServer(Node):
+
+class SpotPickPlaceActionServer(Node):
+    """ROS2 action server for Spot pick and place operations."""
+    
     def __init__(self):
-        super().__init__('pick_and_place_object')
-        self._action_server = ActionServer(self, PickAndPlace, 'timon/pick_and_place_object', self.execute_callback)
-        # Declare parameters for credentials and behavior
-        self.declare_parameters(
-            namespace='',
-            parameters=[
-                ('username', ''),
-                ('password', ''),
-                ('hostname', ''),
-            ]
-        )
-        self.username = self.get_parameter('username').get_parameter_value().string_value
-        self.password = self.get_parameter('password').get_parameter_value().string_value
-        self.hostname = self.get_parameter('hostname').get_parameter_value().string_value            
-
-    def rotate_pixel_back(self, x, y, camera_name):
-        if camera_name in ['frontleft', 'frontright']:
-            width, height = 480, 640
-            # 90 degree counter-clockwise rotation
-            x_orig = y
-            y_orig = width - x
-        else:
-            width, height = 640, 480
-            if camera_name == 'right':
-                # 180 degree rotation
-                x_orig = width - x
-                y_orig = height - y
-            else:
-                # No rotation for other cameras
-                x_orig = x
-                y_orig = y
-        return x_orig, y_orig
-
-    def execute_callback(self, goal_handle):
-        self.get_logger().info(f"PicknPlace action received: {goal_handle.request.task}")
-        result = PickAndPlace.Result()
-        camera_name = goal_handle.request.camera_name
-        if camera_name not in ('frontleft', 'frontright', 'left', 'right', 'back'):
-            self.get_logger().error("Do not use Hand Camera.")
-            result.success, result.message = False, "Use a valid camera"
-            return result
-
-        bbox_xmin = goal_handle.request.x_min
-        bbox_xmax = goal_handle.request.x_max
-        bbox_ymin = goal_handle.request.y_min
-        bbox_ymax = goal_handle.request.y_max
-
-        if None in (bbox_xmin, bbox_xmax, bbox_ymin, bbox_ymax):
-            # Handle the error or return failure
-            self.get_logger().error("One or more bounding box coordinates are not set.")
-            result.success, result.message = False, "Missing coordinates, properly set them in the request"
-            return result 
+        """Initialize the action server."""
+        super().__init__('spot_pick_place_action_server')
         
-        center_x = (bbox_xmax + bbox_xmin) / 2.0
-        center_y = (bbox_ymax + bbox_ymin) / 2.0
+        self._action_server = ActionServer(
+            self,
+            PickAndPlace,
+            'timon/pick_and_place_object',
+            self.execute_callback
+        )
+        
+        # Get parameters
+        self._get_parameters()
+        
+        self.get_logger().info("Spot Pick & Place Action Server initialized")
 
-        orig_center_x, orig_center_y = self.rotate_pixel_back(center_x, center_y, camera_name)
-
-        self.get_logger().info(f"Original center after rotation correction: ({orig_center_x}, {orig_center_y}) based on camera: {camera_name}")
-
-        if goal_handle.request.task == "pick":
-            result.success, result.message = arm_object_pick(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-            goal_handle.succeed()  
-            return result
-        elif goal_handle.request.task == "walk":
-            result.success, result.message = arm_object_walk(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-            goal_handle.succeed() 
-            return result
-        elif goal_handle.request.task == "place":
-            result.success, result.message = arm_object_place(self.username, self.password, self.hostname, orig_center_x, orig_center_y, camera_name)
-            goal_handle.succeed() 
-            return result
-        else: 
-            self.get_logger().error("Received wrong action type")
-            result.success, result.message = False, "Received wrong task type"
-            return result
+    
+    def _get_parameters(self) -> None:
+        """Get parameter values."""
+        self._username = os.environ.get('BOSDYN_CLIENT_USERNAME')
+        self._password = os.environ.get('BOSDYN_CLIENT_PASSWORD')
+        self._hostname = os.environ.get('SPOT_IP')
+        
+        # Validate required parameters
+        if not all([self._username, self._password, self._hostname]):
+            raise ValueError("Missing required parameters: username, password, or hostname")
+    
+    def execute_callback(self, goal_handle):
+        """Execute the pick and place action."""
+        self.get_logger().info(f"Received {goal_handle.request.task} request")
+        
+        result = PickAndPlace.Result()
+        
+        try:
+            # Validate request
+            validation_result = self._validate_request(goal_handle.request)
+            if not validation_result[0]:
+                result.success = False
+                result.message = validation_result[1]
+                goal_handle.succeed()
+                return result
+            
+            # Calculate target coordinates
+            center_x, center_y = self._calculate_target_center(goal_handle.request)
+            
+            # Transform coordinates based on camera orientation
+            orig_center_x, orig_center_y = CameraCoordinateTransformer.transform_coordinates(
+                center_x, center_y, goal_handle.request.camera_name
+            )
+            
+            self.get_logger().info(
+                f"Target center: ({orig_center_x:.1f}, {orig_center_y:.1f}) "
+                f"for camera: {goal_handle.request.camera_name}"
+            )
+            
+            # Execute task
+            success, message = self._execute_task(
+                goal_handle.request.task,
+                orig_center_x,
+                orig_center_y,
+                goal_handle.request.camera_name
+            )
+            
+            result.success = success
+            result.message = message
+            
+        except Exception as e:
+            self.get_logger().error(f"Action execution failed: {e}")
+            result.success = False
+            result.message = f"Execution failed: {e}"
+        
+        goal_handle.succeed()
+        return result
+    
+    def _validate_request(self, request) -> tuple:
+        """Validate the action request.
+        
+        Args:
+            request: The action request
+            
+        Returns:
+            Tuple of (is_valid: bool, error_message: str)
+        """
+        # Validate camera name
+        if not CameraCoordinateTransformer.validate_camera_name(request.camera_name):
+            return False, f"Invalid camera name: {request.camera_name}"
+        
+        # Validate task type
+        if request.task not in TaskFactory.get_supported_tasks():
+            available_tasks = TaskFactory.get_supported_tasks()
+            return False, f"Unsupported task: {request.task}. Available: {available_tasks}"
+        
+        # Validate coordinates
+        coords = [request.x_min, request.x_max, request.y_min, request.y_max]
+        if any(coord is None for coord in coords):
+            return False, "Missing bounding box coordinates"
+        
+        if request.x_min >= request.x_max or request.y_min >= request.y_max:
+            return False, "Invalid bounding box: min values must be less than max values"
+        
+        return True, ""
+    
+    def _calculate_target_center(self, request) -> tuple:
+        """Calculate the center point of the bounding box.
+        
+        Args:
+            request: The action request
+            
+        Returns:
+            Tuple of (center_x, center_y)
+        """
+        center_x = (request.x_max + request.x_min) / 2.0
+        center_y = (request.y_max + request.y_min) / 2.0
+        return center_x, center_y
+    
+    def _execute_task(self, task_type: str, center_x: float, center_y: float, 
+                     camera_name: str) -> tuple:
+        """Execute the manipulation task.
+        
+        Args:
+            task_type: Type of task to execute
+            center_x: X coordinate of target center
+            center_y: Y coordinate of target center
+            camera_name: Name of the camera
+            
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        spot_client = SpotClient(
+            username=self._username,
+            password=self._password,
+            hostname=self._hostname,
+            logger=self.get_logger()
+        )
+        
+        try:
+            with spot_client.get_robot_context():
+                task = TaskFactory.create_task(task_type, spot_client)
+                return task.execute(center_x, center_y, camera_name)
+                
+        except SpotClientError as e:
+            self.get_logger().error(f"Spot client error: {e}")
+            return False, f"Robot communication error: {e}"
+        except Exception as e:
+            self.get_logger().error(f"Task execution error: {e}")
+            return False, f"Task execution failed: {e}"
 
 
 def main(args=None):
+    """Main entry point."""
     rclpy.init(args=args)
-    spot_grasp_action_server = SpotGraspActionServer()
-    rclpy.spin(spot_grasp_action_server)
+    
+    try:
+        action_server = SpotPickPlaceActionServer()
+        rclpy.spin(action_server)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"Failed to start action server: {e}")
+    finally:
+        rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
