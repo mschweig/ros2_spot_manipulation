@@ -101,7 +101,7 @@ class PickTask(ManipulationTask):
             self._spot_client.command_client.robot_command(carry_cmd)
             time.sleep(2.0)
             
-            return True, "Object successfully grasped and in carry mode"
+            return True, "Object successfully grasped. Continue with 'walk' task to approach the goal location"
             
         except Exception as e:
             return False, f"Pick operation failed: {e}"
@@ -219,15 +219,19 @@ class PlaceTask(ManipulationTask):
         command = RobotCommandBuilder.build_synchro_command(gripper_command)
         self._spot_client.command_client.robot_command(command)
         
-        time.sleep(3)  # Wait for object to fall
+        time.sleep(3)  # Wait for object to fall out
         
         # Stow arm
         stow_cmd = RobotCommandBuilder.arm_stow_command()
         stow_command_id = self._spot_client.command_client.robot_command(stow_cmd)
         block_until_arm_arrives(self._spot_client.command_client, stow_command_id, 3.0)
         time.sleep(1)
+
+        #close gripper
+        robot_cmd = RobotCommandBuilder.claw_gripper_close_command()
+        cmd_id = self._spot_client.command_client.robot_command(robot_cmd)
         
-        return True, "Object successfully placed and arm stowed"
+        return True, "Place task successfully executed, Arm is now stowed."
 
 
 class WalkTask(ManipulationTask):
@@ -282,7 +286,7 @@ class WalkTask(ManipulationTask):
                 if response.current_state == manipulation_api_pb2.MANIP_STATE_DONE:
                     break
             
-            return True, "Walk goal successfully reached"
+            return True, "Walk goal successfully reached, check again the bounding box of the goal location to continue with 'place' task"
             
         except Exception as e:
             return False, f"Walk operation failed: {e}"
