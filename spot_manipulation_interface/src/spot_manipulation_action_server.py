@@ -6,47 +6,47 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 
-from spot_manipulation_interface.action import PickAndPlace
+from spot_manipulation_interface.action import Manipulate
 from src.spot_client import SpotClient, SpotClientError
 from src.camera_utils import CameraCoordinateTransformer
 from src.task_factory import TaskFactory
 
 
-class SpotPickPlaceActionServer(Node):
+class SpotManipulationActionServer(Node):
     """ROS2 action server for Spot pick and place operations."""
     
     def __init__(self):
         """Initialize the action server."""
-        super().__init__('spot_pick_place_action_server')
-        
-        self._action_server = ActionServer(
-            self,
-            PickAndPlace,
-            'timon/pick_and_place_object',
-            self.execute_callback
-        )
+        super().__init__('spot_manipulation_action_server')
         
         # Get parameters
         self._get_parameters()
         
-        self.get_logger().info("Spot Pick & Place Action Server initialized")
-
+        self._action_server = ActionServer(
+            self,
+            Manipulate,
+            self._robot_name+'/manipulation_action_server',
+            self.execute_callback
+        )
+                
+        self.get_logger().info("Spot Manipulation Action Server initialized")
     
     def _get_parameters(self) -> None:
         """Get parameter values."""
         self._username = os.environ.get('BOSDYN_CLIENT_USERNAME')
         self._password = os.environ.get('BOSDYN_CLIENT_PASSWORD')
         self._hostname = os.environ.get('SPOT_IP')
+        self._robot_name = os.environ.get('ROBOT_NAME')
         
         # Validate required parameters
-        if not all([self._username, self._password, self._hostname]):
+        if not all([self._username, self._password, self._hostname, self._robot_name]):
             raise ValueError("Missing required parameters: username, password, or hostname")
     
     def execute_callback(self, goal_handle):
         """Execute the pick and place action."""
         self.get_logger().info(f"Received {goal_handle.request.task} request")
         
-        result = PickAndPlace.Result()
+        result = Manipulate.Result()
         
         try:
             # Validate request
@@ -168,7 +168,7 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        action_server = SpotPickPlaceActionServer()
+        action_server = SpotManipulationActionServer()
         rclpy.spin(action_server)
     except KeyboardInterrupt:
         pass

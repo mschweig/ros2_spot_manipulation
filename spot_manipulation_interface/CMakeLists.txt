@@ -7,7 +7,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/PickAndPlace.action"
+  "action/Manipulate.action"
   DEPENDENCIES builtin_interfaces
 )
 
@@ -20,9 +20,9 @@ install(DIRECTORY launch
 )
 
 install(PROGRAMS
-  src/spot_picknplace_action_server.py
+  src/spot_manipulation_action_server.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME spot_picknplace_action_server
+  RENAME spot_manipulation_action_server
 )
 
 ament_package()

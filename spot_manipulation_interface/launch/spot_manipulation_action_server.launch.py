@@ -5,8 +5,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='spot_manipulation_interface',
-            executable='spot_picknplace_action_server',
-            name='spot_picknplace_action_server',
+            executable='spot_manipulation_action_server',
+            name='spot_manipulation_action_server',
             output='screen',
         )
     ])
