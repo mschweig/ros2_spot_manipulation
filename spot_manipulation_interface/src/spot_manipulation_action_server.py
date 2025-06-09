@@ -25,7 +25,7 @@ class SpotManipulationActionServer(Node):
         self._action_server = ActionServer(
             self,
             Manipulate,
-            self._robot_name+'/manipulation_action_server',
+            self._robot_name+'/spot_manipulation_action_server',
             self.execute_callback
         )
                 
